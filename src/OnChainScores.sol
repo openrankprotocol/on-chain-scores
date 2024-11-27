@@ -4,9 +4,10 @@ pragma solidity ^0.8.13;
 contract OnChainScores {
     // Owner address
     address public owner;
-    mapping(uint256 => uint256) public fidToScores;
-    mapping(uint256 => uint256) public fidToRank;
-    event RankAmountSet(uint256 indexed fid, uint256 rank, uint256 score);
+    mapping(uint256 => mapping(uint256 => uint256)) public fidToScores;
+    event ScoreSet(uint256 indexed fid, uint256 score, uint256 mapVersion);
+
+    mapping(uint256 => uint256[]) public ranks;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
@@ -18,18 +19,23 @@ contract OnChainScores {
         owner = _owner;
     }
 
-    function setAirdropAmounts(
+    function setScores(
+        uint256 mapVersion,
         uint256[] calldata fids,
-        uint256[] calldata ranks,
         uint256[] calldata scores
     ) external onlyOwner {
         require(fids.length == scores.length, "Array lengths must match");
-        require(ranks.length == scores.length, "Array lengths must match");
 
         for (uint256 i = 0; i < fids.length; i++) {
-            fidToScores[fids[i]] = scores[i];
-            fidToScores[fids[i]] = ranks[i];
-            emit RankAmountSet(fids[i], ranks[i], scores[i]);
+            fidToScores[mapVersion][fids[i]] = scores[i];
+            emit ScoreSet(fids[i], scores[i], mapVersion);
         }
+    }
+
+    function setRanks(
+        uint256 mapVersion,
+        uint256[] calldata topN
+    ) external onlyOwner {
+        ranks[mapVersion] = topN;
     }
 }
