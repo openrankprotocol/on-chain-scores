@@ -6,7 +6,7 @@ contract OnChainScores {
     address public owner;
     mapping(uint256 => uint256) public fidToScores;
     mapping(uint256 => uint256) public fidToRank;
-    event AmountSet(uint256 indexed fid, uint256 score);
+    event RankAmountSet(uint256 indexed fid, uint256 rank, uint256 score);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
@@ -29,7 +29,7 @@ contract OnChainScores {
         for (uint256 i = 0; i < fids.length; i++) {
             fidToScores[fids[i]] = scores[i];
             fidToScores[fids[i]] = ranks[i];
-            emit AmountSet(fids[i], scores[i]);
+            emit RankAmountSet(fids[i], ranks[i], scores[i]);
         }
     }
 }
