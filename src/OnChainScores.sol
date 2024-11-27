@@ -4,10 +4,15 @@ pragma solidity ^0.8.13;
 contract OnChainScores {
     // Owner address
     address public owner;
-    mapping(uint256 => mapping(uint256 => uint256)) public fidToScores;
-    event ScoreSet(uint256 indexed fid, uint256 score, uint256 mapVersion);
+    struct User {
+        uint256 fid;
+        uint256 score;
+    }
 
-    mapping(uint256 => uint256[]) public ranks;
+    User[] public leaderboard;
+
+    event ScoreSet(uint256 indexed fid, uint256 rank, uint256 score);
+    event ScoreDeleted(uint256 indexed fid, uint256 rank, uint256 score);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
@@ -20,22 +25,43 @@ contract OnChainScores {
     }
 
     function setScores(
-        uint256 mapVersion,
-        uint256[] calldata fids,
-        uint256[] calldata scores
+        uint256[] calldata ranks,
+        User[] calldata users
     ) external onlyOwner {
-        require(fids.length == scores.length, "Array lengths must match");
+        require(ranks.length == users.length, "Array lengths must match");
 
-        for (uint256 i = 0; i < fids.length; i++) {
-            fidToScores[mapVersion][fids[i]] = scores[i];
-            emit ScoreSet(fids[i], scores[i], mapVersion);
+        for (uint256 i = 0; i < ranks.length; i++) {
+            require(
+                ranks[i] < leaderboard.length,
+                "Index exceeded the size of array"
+            );
+
+            leaderboard[ranks[i]] = users[i];
+            emit ScoreSet(users[i].fid, ranks[i], users[i].score);
         }
     }
 
-    function setRanks(
-        uint256 mapVersion,
-        uint256[] calldata topN
-    ) external onlyOwner {
-        ranks[mapVersion] = topN;
+    function appendScores(User[] calldata users) external onlyOwner {
+        uint256 start = leaderboard.length;
+        for (uint256 i = 0; i < users.length; i++) {
+            leaderboard.push(users[i]);
+            emit ScoreSet(users[i].fid, start + i, users[i].score);
+        }
+    }
+
+    function deleteScores(uint256[] calldata ranks) external onlyOwner {
+        for (uint256 i = 0; i < ranks.length; i++) {
+            require(
+                ranks[i] < leaderboard.length,
+                "Index exceeded the size of array"
+            );
+
+            delete leaderboard[ranks[i]];
+            emit ScoreSet(
+                leaderboard[ranks[i]].fid,
+                ranks[i],
+                leaderboard[ranks[i]].score
+            );
+        }
     }
 }
