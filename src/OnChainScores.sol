@@ -28,6 +28,10 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice Leaderboard entries, sorted by score.
     User[] public leaderboard;
 
+    /// @notice FID to their position (rank) in the leaderboard.
+    /// @dev Invariant: an FID exists in fidRank iff it also appears in leaderboard.
+    mapping(uint256 => uint256) public fidRank;
+
     /// @notice Emitted when a leaderboard entry has been set (added).
     /// @param fid Farcaster ID.
     /// @param rank Rank (position) in the leaderboard.
@@ -65,6 +69,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
 
             leaderboard[ranks[i]] = users[i];
+            fidRank[ranks[i]] = ranks[i];
             emit ScoreSet(users[i].fid, ranks[i], users[i].score);
         }
     }
@@ -74,6 +79,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 start = leaderboard.length;
         for (uint256 i = 0; i < users.length; i++) {
             leaderboard.push(users[i]);
+            fidRank[i] = i;
             emit ScoreSet(users[i].fid, start + i, users[i].score);
         }
     }
@@ -85,8 +91,18 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
 
             delete leaderboard[ranks[i]];
+            delete fidRank[i];
             emit ScoreSet(leaderboard[ranks[i]].fid, ranks[i], leaderboard[ranks[i]].score);
         }
+    }
+
+    /// @notice Purges the entire leaderboard.
+    /// Upon success, the leaderboard has no entries (zero length).
+    function purgeLeaderboard() external onlyOwner {
+        for (uint256 rank = 0; rank < leaderboard.length; rank++) {
+            delete fidRank[leaderboard[rank].fid];
+        }
+        delete leaderboard;
     }
 
     /// @notice Health check.  Used to check for installation.
