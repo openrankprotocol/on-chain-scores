@@ -10,6 +10,7 @@ contract OnChainScores {
     }
 
     User[] public leaderboard;
+    mapping(uint256 => uint256) public fidRank;
 
     event ScoreSet(uint256 indexed fid, uint256 rank, uint256 score);
     event ScoreDeleted(uint256 indexed fid, uint256 rank, uint256 score);
@@ -37,6 +38,7 @@ contract OnChainScores {
             );
 
             leaderboard[ranks[i]] = users[i];
+            fidRank[ranks[i]] = ranks[i];
             emit ScoreSet(users[i].fid, ranks[i], users[i].score);
         }
     }
@@ -45,6 +47,7 @@ contract OnChainScores {
         uint256 start = leaderboard.length;
         for (uint256 i = 0; i < users.length; i++) {
             leaderboard.push(users[i]);
+            fidRank[i] = i;
             emit ScoreSet(users[i].fid, start + i, users[i].score);
         }
     }
@@ -57,11 +60,19 @@ contract OnChainScores {
             );
 
             delete leaderboard[ranks[i]];
+            delete fidRank[i];
             emit ScoreSet(
                 leaderboard[ranks[i]].fid,
                 ranks[i],
                 leaderboard[ranks[i]].score
             );
         }
+    }
+
+    function purgeLeaderboard() external onlyOwner {
+        for (uint256 rank = 0; rank < leaderboard.length; rank++) {
+            delete fidRank[leaderboard[rank].fid];
+        }
+        delete leaderboard;
     }
 }
