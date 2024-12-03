@@ -16,10 +16,7 @@ contract ComputeManagerScript is Script {
         OnChainScores onChainScores = new OnChainScores(owner);
 
         // Print the contract address
-        console.log(
-            "OnChainScores contract deployed at:",
-            address(onChainScores)
-        );
+        console.log("OnChainScores contract deployed at:", address(onChainScores));
 
         vm.stopBroadcast();
     }

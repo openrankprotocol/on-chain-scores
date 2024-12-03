@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 contract OnChainScores {
     // Owner address
     address public owner;
+
     struct User {
         uint256 fid;
         uint256 score;
@@ -24,17 +25,11 @@ contract OnChainScores {
         owner = _owner;
     }
 
-    function setScores(
-        uint256[] calldata ranks,
-        User[] calldata users
-    ) external onlyOwner {
+    function setScores(uint256[] calldata ranks, User[] calldata users) external onlyOwner {
         require(ranks.length == users.length, "Array lengths must match");
 
         for (uint256 i = 0; i < ranks.length; i++) {
-            require(
-                ranks[i] < leaderboard.length,
-                "Index exceeded the size of array"
-            );
+            require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
 
             leaderboard[ranks[i]] = users[i];
             emit ScoreSet(users[i].fid, ranks[i], users[i].score);
@@ -51,17 +46,10 @@ contract OnChainScores {
 
     function deleteScores(uint256[] calldata ranks) external onlyOwner {
         for (uint256 i = 0; i < ranks.length; i++) {
-            require(
-                ranks[i] < leaderboard.length,
-                "Index exceeded the size of array"
-            );
+            require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
 
             delete leaderboard[ranks[i]];
-            emit ScoreSet(
-                leaderboard[ranks[i]].fid,
-                ranks[i],
-                leaderboard[ranks[i]].score
-            );
+            emit ScoreSet(leaderboard[ranks[i]].fid, ranks[i], leaderboard[ranks[i]].score);
         }
     }
 }
