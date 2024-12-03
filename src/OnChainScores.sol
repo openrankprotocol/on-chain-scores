@@ -30,6 +30,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     /// @notice FID to their position (rank) in the leaderboard.
     /// @dev Invariant: an FID exists in fidRank iff it also appears in leaderboard.
+    /// Rank values stored here are 1-based; 0 means fid not found.
     mapping(uint256 => uint256) public fidRank;
 
     /// @notice Emitted when a leaderboard entry has been set (added).
@@ -69,7 +70,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
 
             leaderboard[ranks[i]] = users[i];
-            fidRank[users[i].fid] = ranks[i];
+            fidRank[users[i].fid] = ranks[i] + 1;
             emit ScoreSet(users[i].fid, ranks[i], users[i].score);
         }
     }
@@ -79,7 +80,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 start = leaderboard.length;
         for (uint256 i = 0; i < users.length; i++) {
             leaderboard.push(users[i]);
-            fidRank[users[i].fid] = start + i;
+            fidRank[users[i].fid] = start + i + 1;
             emit ScoreSet(users[i].fid, start + i, users[i].score);
         }
     }
