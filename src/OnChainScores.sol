@@ -89,10 +89,11 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     function deleteScores(uint256[] calldata ranks) external onlyOwner {
         for (uint256 i = 0; i < ranks.length; i++) {
             require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
+            uint256 rank = ranks[i];
 
-            delete leaderboard[ranks[i]];
+            emit ScoreDeleted(leaderboard[rank].fid, rank, leaderboard[rank].score);
+            delete leaderboard[rank];
             delete fidRank[i];
-            emit ScoreSet(leaderboard[ranks[i]].fid, ranks[i], leaderboard[ranks[i]].score);
         }
     }
 
