@@ -1,30 +1,57 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+// TODO find a better name
+
+/// @title Global Farcaster OpenkRank scores
 contract OnChainScores {
     // Owner address
     address public owner;
 
+    /// @notice One leaderboard entry.
     struct User {
+        /// @notice Farcaster ID of the user
         uint256 fid;
+        /// @notice OpenRank score of the user.
+        /// The value is scaled so that score range [0.0, 1.0) maps to
+        /// [0, 2**256), e.g. 0x8000...0000 == 0.5, 0x4000...0000 == 0.25, etc.
+        /// 1.0 is an exception: it maps not to 2**256 but to 2**256-1
+        /// because 2**256 is out of uint256 range.
+        /// Instead, type(uint256).max (2**256-1) unambiguously identifies 1.0.
+        /// 1-2**-256, which is the score value that would otherwise map to
+        /// the same type(uint256).max, cannot be represented,
+        /// which is okay because it cannot be represented in IEEE 754 either.
         uint256 score;
     }
 
+    /// @notice Leaderboard entries, sorted by score.
     User[] public leaderboard;
 
+    /// @notice Emitted when a leaderboard entry has been set (added).
+    /// @param fid Farcaster ID.
+    /// @param rank Rank (position) in the leaderboard.
+    /// @param score The score value.
     event ScoreSet(uint256 indexed fid, uint256 rank, uint256 score);
+
+    /// @notice Emitted when a leaderboard entry has been deleted.
+    /// @param fid Farcaster ID.
+    /// @param rank Rank (position) in the leaderboard.
+    /// @param score The score value.
     event ScoreDeleted(uint256 indexed fid, uint256 rank, uint256 score);
+
+    // TODO document the event behavior upon score update
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
         _;
     }
 
-    // Initialize the contract with whitelisted addresses
+    /// @notice Initializes the contract with whitelisted addresses.
     constructor(address _owner) {
         owner = _owner;
     }
 
+    /// @notice Sets/replaces the leaderboard entry at ranks[i] with users[i].
     function setScores(uint256[] calldata ranks, User[] calldata users) external onlyOwner {
         require(ranks.length == users.length, "Array lengths must match");
 
@@ -36,6 +63,7 @@ contract OnChainScores {
         }
     }
 
+    /// @notice Extends the leaderboard with additional entries at the end.
     function appendScores(User[] calldata users) external onlyOwner {
         uint256 start = leaderboard.length;
         for (uint256 i = 0; i < users.length; i++) {
@@ -44,6 +72,8 @@ contract OnChainScores {
         }
     }
 
+    /// @notice Wipes leaderboard entries at the given ranks.
+    /// The entries are zeroed out (FID 0, score 0).
     function deleteScores(uint256[] calldata ranks) external onlyOwner {
         for (uint256 i = 0; i < ranks.length; i++) {
             require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
