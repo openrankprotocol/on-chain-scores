@@ -67,6 +67,8 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 start = leaderboard.length;
         uint256 lastScore = start > 0 ? leaderboard[start - 1].score : type(uint256).max;
         for (uint256 i = 0; i < users.length; i++) {
+            uint256 fid = users[i].fid;
+            require(fidRank[fid] == 0, "FID already ranked");
             uint256 score = users[i].score;
             require(score <= lastScore, "score not sorted");
             leaderboard.push(users[i]);
