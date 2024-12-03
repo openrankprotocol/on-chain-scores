@@ -1,6 +1,13 @@
+# Build output
 /out
+
+# Environment variables (runtime config)
 .env
+
+# Tx and script deployment records
 /broadcast/
+
+# Optimization cache
 /cache/
 
 ### JetBrains template
