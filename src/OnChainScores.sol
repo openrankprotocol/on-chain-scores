@@ -62,19 +62,6 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /// @notice Sets/replaces the leaderboard entry at ranks[i] with users[i].
-    function setScores(uint256[] calldata ranks, User[] calldata users) external onlyOwner {
-        require(ranks.length == users.length, "Array lengths must match");
-
-        for (uint256 i = 0; i < ranks.length; i++) {
-            require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
-
-            leaderboard[ranks[i]] = users[i];
-            fidRank[users[i].fid] = ranks[i] + 1;
-            emit ScoreSet(users[i].fid, ranks[i], users[i].score);
-        }
-    }
-
     /// @notice Extends the leaderboard with additional entries at the end.
     function appendScores(User[] calldata users) external onlyOwner {
         uint256 start = leaderboard.length;
@@ -82,20 +69,6 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             leaderboard.push(users[i]);
             fidRank[users[i].fid] = start + i + 1;
             emit ScoreSet(users[i].fid, start + i, users[i].score);
-        }
-    }
-
-    /// @notice Wipes leaderboard entries at the given ranks.
-    /// The entries are zeroed out (FID 0, score 0).
-    function deleteScores(uint256[] calldata ranks) external onlyOwner {
-        for (uint256 i = 0; i < ranks.length; i++) {
-            require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
-            uint256 rank = ranks[i];
-            if (leaderboard[rank].fid != 0) {
-                emit ScoreDeleted(leaderboard[rank].fid, rank, leaderboard[rank].score);
-            }
-            delete fidRank[leaderboard[rank].fid];
-            delete leaderboard[rank];
         }
     }
 
