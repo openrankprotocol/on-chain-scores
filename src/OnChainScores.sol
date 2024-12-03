@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 // TODO find a better name
 
 /// @title Global Farcaster OpenkRank scores
-contract OnChainScores {
-    // Owner address
-    address public owner;
-
+contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice One leaderboard entry.
     struct User {
         /// @notice Farcaster ID of the user
@@ -41,15 +42,20 @@ contract OnChainScores {
 
     // TODO document the event behavior upon score update
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // make it impossible to call initialize() on the impl
+        _disableInitializers();
     }
 
-    /// @notice Initializes the contract with whitelisted addresses.
-    constructor(address _owner) {
-        owner = _owner;
+    /// @notice Initializes the contract state (which goes in the proxy).
+    /// @dev Only for the proxy to call exactly once at deploy time.
+    function initialize() public initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Sets/replaces the leaderboard entry at ranks[i] with users[i].
     function setScores(uint256[] calldata ranks, User[] calldata users) external onlyOwner {
@@ -81,5 +87,10 @@ contract OnChainScores {
             delete leaderboard[ranks[i]];
             emit ScoreSet(leaderboard[ranks[i]].fid, ranks[i], leaderboard[ranks[i]].score);
         }
+    }
+
+    /// @notice Health check.  Used to check for installation.
+    function healthCheck(uint256 nonce) public pure returns (uint256) {
+        return nonce * 40 + 2;
     }
 }
