@@ -79,7 +79,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 start = leaderboard.length;
         for (uint256 i = 0; i < users.length; i++) {
             leaderboard.push(users[i]);
-            fidRank[i] = i;
+            fidRank[users[i].fid] = start + i;
             emit ScoreSet(users[i].fid, start + i, users[i].score);
         }
     }
