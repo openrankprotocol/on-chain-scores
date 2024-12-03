@@ -65,10 +65,14 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice Extends the leaderboard with additional entries at the end.
     function appendScores(User[] calldata users) external onlyOwner {
         uint256 start = leaderboard.length;
+        uint256 lastScore = start > 0 ? leaderboard[start - 1].score : type(uint256).max;
         for (uint256 i = 0; i < users.length; i++) {
+            uint256 score = users[i].score;
+            require(score <= lastScore, "score not sorted");
             leaderboard.push(users[i]);
             fidRank[users[i].fid] = start + i + 1;
-            emit ScoreSet(users[i].fid, start + i, users[i].score);
+            emit ScoreSet(users[i].fid, start + i, score);
+            lastScore = score;
         }
     }
 
