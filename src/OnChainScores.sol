@@ -102,6 +102,9 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// Upon success, the leaderboard has no entries (zero length).
     function purgeLeaderboard() external onlyOwner {
         for (uint256 rank = 0; rank < leaderboard.length; rank++) {
+            if (leaderboard[rank].fid != 0) {
+                emit ScoreDeleted(leaderboard[rank].fid, rank, leaderboard[rank].score);
+            }
             delete fidRank[leaderboard[rank].fid];
         }
         delete leaderboard;
