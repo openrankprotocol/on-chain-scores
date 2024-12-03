@@ -69,7 +69,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
 
             leaderboard[ranks[i]] = users[i];
-            fidRank[ranks[i]] = ranks[i];
+            fidRank[users[i].fid] = ranks[i];
             emit ScoreSet(users[i].fid, ranks[i], users[i].score);
         }
     }
@@ -93,8 +93,8 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             if (leaderboard[rank].fid != 0) {
                 emit ScoreDeleted(leaderboard[rank].fid, rank, leaderboard[rank].score);
             }
+            delete fidRank[leaderboard[rank].fid];
             delete leaderboard[rank];
-            delete fidRank[i];
         }
     }
 
