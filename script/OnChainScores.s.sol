@@ -6,6 +6,9 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {OnChainScores} from "../src/OnChainScores.sol";
 
 contract ComputeManagerScript is Script {
+
+OnChainScores.User[] private users;
+
     function run() public {
         // Load environment variables (such as private key, etc.)
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
@@ -23,6 +26,28 @@ contract ComputeManagerScript is Script {
 
         OnChainScores instance = OnChainScores(proxy);
         require(instance.healthCheck(1) == 42, "deployment health check failed");
+
+        users.push(OnChainScores.User(2148, 100));
+        users.push(OnChainScores.User(2147, 10));
+        instance.appendScores(users);
+
+        uint256 fid;
+        uint256 score;
+
+        require(instance.leaderboardLength() == 2);
+
+        (fid, score) = instance.leaderboard(0);
+        require(fid == 2148, "fid 2148 mismatch");
+        require(score == 100, "score mismatch for fid 2148");
+
+        (fid, score) = instance.leaderboard(1);
+
+        require(fid == 2147, "fid 2147 mismatch");
+        require(score == 10, "score mismatch for fid 2147");
+
+        instance.truncate(5);
+
+        require(instance.leaderboardLength() == 0);
 
         vm.stopBroadcast();
     }
