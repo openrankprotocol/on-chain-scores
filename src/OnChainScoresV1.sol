@@ -79,11 +79,11 @@ contract OnChainScoresV1 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
     }
 
-    /// @notice Truncate a tail of the given length of the leaderboard.
+    /// @notice Truncates a tail of the given length of the leaderboard.
     /// If the leaderboard has less entries, truncate to empty.
     function truncate(uint256 count) external onlyOwner {
         uint256 length = leaderboard.length;
-        for(; length > 0 && count > 0; count--) {
+        for (; length > 0 && count > 0; count--) {
             User memory user = leaderboard[--length];
             leaderboard.pop();
             delete fidRank[user.fid];
@@ -91,9 +91,76 @@ contract OnChainScoresV1 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
     }
 
-    /// @notice Return number of entries in the leaderboard.
+    /// @notice Returns number of entries in the leaderboard.
     function leaderboardLength() external view returns (uint256) {
         return leaderboard.length;
+    }
+
+    /// @notice Returns user (FID and score) at the given rank.
+    /// @param rank The rank.  One-based, i.e. 1 is the top user.
+    function getUserAtRank(uint256 rank) external view returns (User memory user) {
+        require(rank >= 1 && rank <= leaderboard.length, "rank out of range");
+        user = leaderboard[rank - 1];
+    }
+
+    /// @notice Returns users (FIDs and scores) at the given ranks.
+    /// @param ranks The ranks.  One-based, i.e. 1 is the top user.
+    /// Nonexistent ranks result in empty user (fid = 0, score = 0).
+    function getUsersAtRanks(uint256[] calldata ranks) external view returns (User[] memory users) {
+        users = new User[](ranks.length);
+        for (uint256 i = 0; i < ranks.length; i++) {
+            uint256 rank = ranks[i];
+            if (rank >= 1 && rank <= leaderboard.length) {
+                users[i] = leaderboard[rank - 1];
+            }
+        }
+    }
+
+    /// @notice Returns users (FIDs and scores) in the given rank range.
+    /// @param start The first rank to return.  One-based, i.e. 1 is the top user.
+    /// @param count The number of users to return.
+    /// If start/count is too large, only those that are in the leaderboard are returned,
+    /// e.g. on a 100-user leaderboard (ranks 1-100), start=91, count=20 (ranks 91-110) returns only 10 users
+    /// (ranks 91-100), and start=101, count=10 (ranks 101-110) returns no users.
+    function getUsersInRankRange(uint256 start, uint256 count) external view returns (User[] memory users) {
+        if (start < 1) {
+            start = 1;
+        }
+        start--; // convert to zero-based
+        if (start >= leaderboard.length) {
+            start = leaderboard.length;
+        }
+        if (start + count > leaderboard.length) {
+            count = leaderboard.length - start;
+        }
+        users = new User[](count);
+        for (uint256 i = 0; i < count; i++) {
+            users[i] = leaderboard[start++];
+        }
+    }
+
+    /// @notice Returns the rank and score of the given FID.
+    /// @param fid Farcaster ID.
+    /// @return rank (One-based) rank; 0 means unranked.
+    /// @return score Score value; 0 if unranked.
+    function getRankAndScoreForFID(uint256 fid) external view returns (uint256 rank, uint256 score) {
+        rank = fidRank[fid];
+        score = rank > 0 ? leaderboard[rank - 1].score : 0;
+    }
+
+    /// @notice Returns the ranks and scores of the given FIDs.
+    /// @param fids Farcaster IDs.
+    /// @return ranks (One-based) ranks, i.e. 1 is the top user.  0 means unranked.
+    /// @return scores Scores; 0 if unranked.
+    function getRanksAndScoresForFIDs(uint256[] calldata fids) external view returns (uint256[] memory ranks, uint256[] memory scores) {
+        ranks = new uint256[](fids.length);
+        scores = new uint256[](fids.length);
+        for (uint256 i = 0; i < fids.length; i++) {
+            uint256 fid = fids[i];
+            uint256 rank = fidRank[fid];
+            ranks[i] = rank;
+            scores[i] = rank > 0 ? leaderboard[rank - 1].score : 0;
+        }
     }
 
     /// @notice Health check.  Used to check for installation.
