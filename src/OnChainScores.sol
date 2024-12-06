@@ -28,6 +28,11 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice Leaderboard entries, sorted by score.
     User[] public leaderboard;
 
+    /// @notice FID to their position (rank) in the leaderboard.
+    /// @dev Invariant: an FID exists in fidRank iff it also appears in leaderboard.
+    /// Rank values stored here are 1-based; 0 means fid not found.
+    mapping(uint256 => uint256) public fidRank;
+
     /// @notice Emitted when a leaderboard entry has been set (added).
     /// @param fid Farcaster ID.
     /// @param rank Rank (position) in the leaderboard.
@@ -57,36 +62,32 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /// @notice Sets/replaces the leaderboard entry at ranks[i] with users[i].
-    function setScores(uint256[] calldata ranks, User[] calldata users) external onlyOwner {
-        require(ranks.length == users.length, "Array lengths must match");
-
-        for (uint256 i = 0; i < ranks.length; i++) {
-            require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
-
-            leaderboard[ranks[i]] = users[i];
-            emit ScoreSet(users[i].fid, ranks[i], users[i].score);
-        }
-    }
-
     /// @notice Extends the leaderboard with additional entries at the end.
     function appendScores(User[] calldata users) external onlyOwner {
         uint256 start = leaderboard.length;
+        uint256 lastScore = start > 0 ? leaderboard[start - 1].score : type(uint256).max;
         for (uint256 i = 0; i < users.length; i++) {
+            uint256 fid = users[i].fid;
+            require(fidRank[fid] == 0, "FID already ranked");
+            uint256 score = users[i].score;
+            require(score <= lastScore, "score not sorted");
             leaderboard.push(users[i]);
-            emit ScoreSet(users[i].fid, start + i, users[i].score);
+            fidRank[users[i].fid] = start + i + 1;
+            emit ScoreSet(users[i].fid, start + i, score);
+            lastScore = score;
         }
     }
 
-    /// @notice Wipes leaderboard entries at the given ranks.
-    /// The entries are zeroed out (FID 0, score 0).
-    function deleteScores(uint256[] calldata ranks) external onlyOwner {
-        for (uint256 i = 0; i < ranks.length; i++) {
-            require(ranks[i] < leaderboard.length, "Index exceeded the size of array");
-
-            delete leaderboard[ranks[i]];
-            emit ScoreSet(leaderboard[ranks[i]].fid, ranks[i], leaderboard[ranks[i]].score);
+    /// @notice Truncate a tail of the given length of the leaderboard.
+    function truncate(uint256 length) external onlyOwner {
+        require(length <= leaderboard.length);
+        for (uint256 rank = leaderboard.length - length; rank < leaderboard.length; rank++) {
+            if (leaderboard[rank].fid != 0) {
+                emit ScoreDeleted(leaderboard[rank].fid, rank, leaderboard[rank].score);
+            }
+            delete fidRank[leaderboard[rank].fid];
         }
+        delete leaderboard;
     }
 
     /// @notice Health check.  Used to check for installation.
