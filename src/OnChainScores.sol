@@ -79,15 +79,20 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     /// @notice Truncate a tail of the given length of the leaderboard.
-    function truncate(uint256 length) external onlyOwner {
-        require(length <= leaderboard.length);
-        for (uint256 rank = leaderboard.length - length; rank < leaderboard.length; rank++) {
-            if (leaderboard[rank].fid != 0) {
-                emit ScoreDeleted(leaderboard[rank].fid, rank, leaderboard[rank].score);
-            }
-            delete fidRank[leaderboard[rank].fid];
+    /// If the leaderboard has less entries, truncate to empty.
+    function truncate(uint256 count) external onlyOwner {
+        uint256 length = leaderboard.length;
+        for(; length > 0 && count > 0; count--) {
+            User memory user = leaderboard[--length];
+            leaderboard.pop();
+            delete fidRank[user.fid];
+            emit ScoreDeleted(user.fid, leaderboard.length, user.score);
         }
-        delete leaderboard;
+    }
+
+    /// @notice Return number of entries in the leaderboard.
+    function leaderboardLength() external view returns (uint256) {
+        return leaderboard.length;
     }
 
     /// @notice Health check.  Used to check for installation.
