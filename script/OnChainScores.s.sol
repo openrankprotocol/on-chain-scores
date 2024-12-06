@@ -6,8 +6,7 @@ import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {OnChainScoresV1} from "../src/OnChainScoresV1.sol";
 
 contract ComputeManagerScript is Script {
-
-OnChainScoresV1.User[] private users;
+    OnChainScoresV1.User[] private users;
 
     function run() public {
         // Load environment variables (such as private key, etc.)

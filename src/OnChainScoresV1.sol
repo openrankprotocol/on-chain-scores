@@ -152,7 +152,11 @@ contract OnChainScoresV1 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param fids Farcaster IDs.
     /// @return ranks (One-based) ranks, i.e. 1 is the top user.  0 means unranked.
     /// @return scores Scores; 0 if unranked.
-    function getRanksAndScoresForFIDs(uint256[] calldata fids) external view returns (uint256[] memory ranks, uint256[] memory scores) {
+    function getRanksAndScoresForFIDs(uint256[] calldata fids)
+        external
+        view
+        returns (uint256[] memory ranks, uint256[] memory scores)
+    {
         ranks = new uint256[](fids.length);
         scores = new uint256[](fids.length);
         for (uint256 i = 0; i < fids.length; i++) {

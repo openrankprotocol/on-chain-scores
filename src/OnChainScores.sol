@@ -82,7 +82,7 @@ contract OnChainScores is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// If the leaderboard has less entries, truncate to empty.
     function truncate(uint256 count) external onlyOwner {
         uint256 length = leaderboard.length;
-        for(; length > 0 && count > 0; count--) {
+        for (; length > 0 && count > 0; count--) {
             User memory user = leaderboard[--length];
             leaderboard.pop();
             delete fidRank[user.fid];
