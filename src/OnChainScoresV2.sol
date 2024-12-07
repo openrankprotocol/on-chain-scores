@@ -27,7 +27,7 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     /// @notice Leaderboard entries, sorted by score.
-    User[] public leaderboard;
+    User[] private leaderboard;
 
     /// @notice FID to their position (rank) in the leaderboard.
     /// @dev Invariant: an FID exists in fidRank iff it also appears in leaderboard.
