@@ -27,19 +27,16 @@ contract ComputeManagerScript is Script {
             users.push(OnChainScoresV2.User(2147, 10));
             instance.appendScores(users);
 
-            uint256 fid;
-            uint256 score;
-
             require(instance.leaderboardLength() == 2);
 
-            (fid, score) = instance.leaderboard(0);
-            require(fid == 2148, "fid 2148 mismatch");
-            require(score == 100, "score mismatch for fid 2148");
+            OnChainScoresV2.User memory user = instance.getUserAtRank(1);
+            require(user.fid == 2148, "fid 2148 mismatch");
+            require(user.score == 100, "score mismatch for fid 2148");
 
-            (fid, score) = instance.leaderboard(1);
+            user = instance.getUserAtRank(2);
 
-            require(fid == 2147, "fid 2147 mismatch");
-            require(score == 10, "score mismatch for fid 2147");
+            require(user.fid == 2147, "fid 2147 mismatch");
+            require(user.score == 10, "score mismatch for fid 2147");
 
             instance.truncate(5);
 
