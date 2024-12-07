@@ -46,8 +46,6 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param score The score value.
     event ScoreDeleted(uint256 indexed fid, uint256 rank, uint256 score);
 
-    // TODO document the event behavior upon score update
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         // make it impossible to call initialize() on the impl
