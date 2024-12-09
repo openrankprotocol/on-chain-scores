@@ -3,7 +3,8 @@ pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
-import {OnChainScoresV2} from "../src/OnChainScoresV2.sol";
+import {OnChainScoresV2} from "src/OnChainScoresV2.sol";
+import {IVerificationsV4Reader} from "src/IVerificationsV4Reader.sol";
 
 contract ComputeManagerScript is Script {
     OnChainScoresV2.User[] private users;
@@ -12,15 +13,25 @@ contract ComputeManagerScript is Script {
         // Load environment variables (such as private key, etc.)
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address proxy = vm.envAddress("PROXY_CONTRACT_ADDRESS");
+        address fidLookupAddress = vm.envAddress("FID_LOOKUP_ADDRESS");
 
         // Start broadcasting the transaction
         vm.startBroadcast(deployerPrivateKey);
 
-        if (proxy == 0x0000000000000000000000000000000000000000) {
-            proxy = Upgrades.deployUUPSProxy("OnChainScoresV2.sol", abi.encodeCall(OnChainScoresV2.initialize, ()));
-            console.log("proxy deployed at:", proxy);
+        bool upgrade = proxy != 0x0000000000000000000000000000000000000000;
 
-            OnChainScoresV2 instance = OnChainScoresV2(proxy);
+        if (!upgrade) {
+            proxy = Upgrades.deployUUPSProxy("OnChainScoresV2.sol", abi.encodeCall(OnChainScoresV2.initialize, ()));
+            console.log("deployed proxy at:", proxy);
+        } else {
+            Upgrades.upgradeProxy(proxy, "OnChainScoresV2.sol", "");
+            console.log("upgraded proxy at:", proxy);
+        }
+
+        OnChainScoresV2 instance = OnChainScoresV2(proxy);
+        instance.setFidLookup(IVerificationsV4Reader(fidLookupAddress));
+
+        if (!upgrade) {
             require(instance.healthCheck(1) == 42, "deployment health check failed");
 
             users.push(OnChainScoresV2.User(2148, 100));
@@ -41,9 +52,6 @@ contract ComputeManagerScript is Script {
             instance.truncate(5);
 
             require(instance.leaderboardLength() == 0);
-        } else {
-            Upgrades.upgradeProxy(proxy, "OnChainScoresV2.sol", "");
-            console.log("proxy deployed at:", proxy);
         }
 
         vm.stopBroadcast();

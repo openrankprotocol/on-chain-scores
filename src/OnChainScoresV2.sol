@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IVerificationsV4Reader} from "src/IVerificationsV4Reader.sol";
 
 // TODO find a better name
 
@@ -26,6 +27,8 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 score;
     }
 
+    // --- BEGIN state variables ---
+
     /// @notice Leaderboard entries, sorted by score.
     User[] private leaderboard;
 
@@ -33,6 +36,11 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @dev Invariant: an FID exists in fidRank iff it also appears in leaderboard.
     /// Rank values stored here are 1-based; 0 means fid not found.
     mapping(uint256 => uint256) public fidRank;
+
+    /// @dev FID lookup contract
+    IVerificationsV4Reader public fidLookup;
+
+    // --- END state variables ---
 
     /// @notice Emitted when a leaderboard entry has been set (added).
     /// @param fid Farcaster ID.
@@ -59,6 +67,10 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         __UUPSUpgradeable_init();
     }
 
+    function setFidLookup(IVerificationsV4Reader _fidLookup) public onlyOwner {
+        fidLookup = _fidLookup;
+    }
+
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /// @notice Extends the leaderboard with additional entries at the end.
@@ -67,6 +79,7 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint256 lastScore = start > 0 ? leaderboard[start - 1].score : type(uint256).max;
         for (uint256 i = 0; i < users.length; i++) {
             uint256 fid = users[i].fid;
+            require(fid != 0, "zero FID");
             require(fidRank[fid] == 0, "FID already ranked");
             uint256 score = users[i].score;
             require(score <= lastScore, "score not sorted");
@@ -142,7 +155,11 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @return rank (One-based) rank; 0 means unranked.
     /// @return score Score value; 0 if unranked.
     function getRankAndScoreForFID(uint256 fid) external view returns (uint256 rank, uint256 score) {
-        rank = fidRank[fid];
+        (rank, score) = _getRankAndScoreForFID(fid);
+    }
+
+    function _getRankAndScoreForFID(uint256 fid) private view returns (uint256 rank, uint256 score) {
+        rank = fid > 0 ? fidRank[fid] : 0;
         score = rank > 0 ? leaderboard[rank - 1].score : 0;
     }
 
@@ -155,14 +172,40 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         view
         returns (uint256[] memory ranks, uint256[] memory scores)
     {
+        (ranks, scores) = _getRanksAndScoresForFIDs(fids);
+    }
+
+    function _getRanksAndScoresForFIDs(uint256[] memory fids)
+        private
+        view
+        returns (uint256[] memory ranks, uint256[] memory scores)
+    {
         ranks = new uint256[](fids.length);
         scores = new uint256[](fids.length);
         for (uint256 i = 0; i < fids.length; i++) {
             uint256 fid = fids[i];
-            uint256 rank = fidRank[fid];
+            uint256 rank = fid > 0 ? fidRank[fid] : 0;
             ranks[i] = rank;
             scores[i] = rank > 0 ? leaderboard[rank - 1].score : 0;
         }
+    }
+
+    function getFIDRankAndScoreForVerifier(address verifier)
+        external
+        view
+        returns (uint256 fid, uint256 rank, uint256 score)
+    {
+        fid = fidLookup.getFid(verifier);
+        (rank, score) = _getRankAndScoreForFID(fid);
+    }
+
+    function getFIDsRanksAndScoresForVerifiers(address[] calldata verifiers)
+        external
+        view
+        returns (uint256[] memory fids, uint256[] memory ranks, uint256[] memory scores)
+    {
+        fids = fidLookup.getFids(verifiers);
+        (ranks, scores) = _getRanksAndScoresForFIDs(fids);
     }
 
     /// @notice Health check.  Used to check for installation.
