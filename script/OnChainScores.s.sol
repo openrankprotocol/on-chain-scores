@@ -4,10 +4,11 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {OnChainScoresV2} from "src/OnChainScoresV2.sol";
+import {IFarcasterOpenRank} from "src/IFarcasterOpenRank.sol";
 import {IVerificationsV4Reader} from "src/IVerificationsV4Reader.sol";
 
 contract ComputeManagerScript is Script {
-    OnChainScoresV2.User[] private users;
+    IFarcasterOpenRank.User[] private users;
 
     function run() public {
         // Load environment variables (such as private key, etc.)
@@ -34,13 +35,13 @@ contract ComputeManagerScript is Script {
         if (!upgrade) {
             require(instance.healthCheck(1) == 42, "deployment health check failed");
 
-            users.push(OnChainScoresV2.User(2148, 100));
-            users.push(OnChainScoresV2.User(2147, 10));
+            users.push(IFarcasterOpenRank.User(2148, 100));
+            users.push(IFarcasterOpenRank.User(2147, 10));
             instance.appendScores(users);
 
             require(instance.leaderboardLength() == 2);
 
-            OnChainScoresV2.User memory user = instance.getUserAtRank(1);
+            IFarcasterOpenRank.User memory user = instance.getUserAtRank(1);
             require(user.fid == 2148, "fid 2148 mismatch");
             require(user.score == 100, "score mismatch for fid 2148");
 
