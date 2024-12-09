@@ -190,6 +190,11 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
     }
 
+    /// @notice Returns the FID, rank, and score for the given verifier address.
+    /// @param verifier Verifier address.
+    /// @return fid Farcaster ID; 0 if no FID is associated with the given verifier address.
+    /// @return rank (One-based) rank; 0 if unranked or no FID is associated with the given verifier address.
+    /// @return score Score value; 0 if unranked or no FID is associated with the given verifier address.
     function getFIDRankAndScoreForVerifier(address verifier)
         external
         view
@@ -199,6 +204,11 @@ contract OnChainScoresV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         (rank, score) = _getRankAndScoreForFID(fid);
     }
 
+    /// @notice Returns the FIDs, ranks, and scores for the given verifier addresses.
+    /// @param verifiers Verifier addresses.
+    /// @return fids Farcaster IDs; 0 if no FID is associated with the given verifier address.
+    /// @return ranks (One-based) ranks; 0 if unranked or no FID is associated with the given verifier address.
+    /// @return scores Score values; 0 if unranked or no FID is associated with the given verifier address.
     function getFIDsRanksAndScoresForVerifiers(address[] calldata verifiers)
         external
         view
