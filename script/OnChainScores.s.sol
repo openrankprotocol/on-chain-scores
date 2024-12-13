@@ -13,7 +13,7 @@ contract ComputeManagerScript is Script {
     function run() public {
         // Load environment variables (such as private key, etc.)
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address proxy = vm.envAddress("PROXY_CONTRACT_ADDRESS");
+        address proxy = vm.envAddress("FARCASTER_PROXY_CONTRACT_ADDRESS");
         address fidLookupAddress = vm.envAddress("FID_LOOKUP_ADDRESS");
 
         // Start broadcasting the transaction
