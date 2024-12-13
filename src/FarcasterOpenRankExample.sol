@@ -11,7 +11,7 @@ contract FarcasterOpenRankExample {
     }
 
     function isTop100(address verifier) external view returns (bool) {
-        (uint256 fid, uint256 rank, uint256 score) = farcasterOpenRank.getFIDRankAndScoreForVerifier(verifier);
+        (, uint256 rank,) = farcasterOpenRank.getFIDRankAndScoreForVerifier(verifier);
         return rank >= 1 && rank <= 100;
     }
 }
