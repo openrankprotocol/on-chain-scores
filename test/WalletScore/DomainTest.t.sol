@@ -28,6 +28,15 @@ contract DomainTest is WalletScoreTestBase {
         vm.prank(nobody);
         vm.expectRevert();
         ws.registerDomain(domainAvici, DOMAIN_METADATA);
+        vm.prank(publisher1Addr);
+        vm.expectRevert();
+        ws.registerDomain(domainAvici, DOMAIN_METADATA);
+    }
+
+    function test_registerDomain_RejectEmptyMetadata() public {
+        vm.prank(admin);
+        vm.expectRevert();
+        ws.registerDomain(domainAvici, "");
     }
 
     function test_registerDomain_RevertWhenAlreadyExists() public {
