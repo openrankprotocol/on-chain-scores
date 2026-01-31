@@ -274,7 +274,7 @@ contract BiddingTest is WalletScoreTestBase {
     }
 
     function test_advanceRequest_IdempotentWhenAssigned() public {
-        BidId bidId = _submitBidAsPublisher1(requestId, 0.5 ether, 30 minutes);
+        _submitBidAsPublisher1(requestId, 0.5 ether, 30 minutes);
 
         _advancePastQuotingDeadline(requestId);
         ws.advanceRequest(requestId);
@@ -290,7 +290,7 @@ contract BiddingTest is WalletScoreTestBase {
     }
 
     function test_advanceRequest_IdempotentWhenFulfilled() public {
-        BidId bidId = _submitBidAsPublisher1(requestId, 0.5 ether, 30 minutes);
+        _submitBidAsPublisher1(requestId, 0.5 ether, 30 minutes);
 
         _advancePastQuotingDeadline(requestId);
         ws.advanceRequest(requestId);

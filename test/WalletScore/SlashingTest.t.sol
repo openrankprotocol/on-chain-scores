@@ -233,7 +233,7 @@ contract SlashingTest is WalletScoreTestBase {
     function test_advanceRequest_SlashDistribution_WithLostBidders() public {
         RequestId requestId = _createRequestWithWideWindow(1 ether);
 
-        BidId bid1 = _submitBidAsPublisher1(requestId, 0.3 ether, 20 minutes);
+        _submitBidAsPublisher1(requestId, 0.3 ether, 20 minutes);
         _submitBidAsPublisher2(requestId, 0.4 ether, 50 minutes);
         _submitBidAsPublisher3(requestId, 0.5 ether, 70 minutes);
 
