@@ -34,7 +34,6 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
 
     // Domain storage
     mapping(DomainId => string) private _domainMetadataUri;
-    mapping(DomainId => bool) private _domainExists;
 
     // Publisher storage
     mapping(PublisherId => Publisher) private _publishers;
@@ -123,10 +122,12 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         override
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        if (_domainExists[domainId]) {
+        if (bytes(_domainMetadataUri[domainId]).length > 0) {
             revert DomainAlreadyExists(domainId);
         }
-        _domainExists[domainId] = true;
+        if (bytes(metadataUri).length == 0) {
+            revert DomainNotFound(domainId);
+        }
         _domainMetadataUri[domainId] = metadataUri;
         emit DomainRegistered(domainId, metadataUri);
     }
@@ -137,7 +138,7 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         override
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        if (!_domainExists[domainId]) {
+        if (bytes(_domainMetadataUri[domainId]).length == 0) {
             revert DomainNotFound(domainId);
         }
         _domainMetadataUri[domainId] = metadataUri;
@@ -308,7 +309,7 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         onlyRole(PUBLISHER_ROLE)
         returns (ScoreSetId)
     {
-        if (!_domainExists[domainId]) {
+        if (bytes(_domainMetadataUri[domainId]).length == 0) {
             revert DomainNotFound(domainId);
         }
 
@@ -407,7 +408,7 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         uint256 fulfillmentDeadline,
         BidSelection selectionMode
     ) external payable override returns (RequestId) {
-        if (!_domainExists[domainId]) {
+        if (bytes(_domainMetadataUri[domainId]).length == 0) {
             revert DomainNotFound(domainId);
         }
 
@@ -902,7 +903,7 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
 
     /// @inheritdoc IWalletScore
     function getDomainMetadataUri(DomainId id) external view override returns (string memory) {
-        if (!_domainExists[id]) {
+        if (bytes(_domainMetadataUri[id]).length == 0) {
             revert DomainNotFound(id);
         }
         return _domainMetadataUri[id];
@@ -1017,7 +1018,7 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         override
         returns (ScoreSetId)
     {
-        if (!_domainExists[domainId]) {
+        if (bytes(_domainMetadataUri[domainId]).length == 0) {
             revert DomainNotFound(domainId);
         }
 
