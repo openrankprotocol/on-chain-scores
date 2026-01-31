@@ -66,10 +66,8 @@ abstract contract WalletScoreTestBase is Test {
 
     function _deployContract() internal {
         vm.startPrank(admin);
-        address proxy = Upgrades.deployUUPSProxy(
-            "WalletScoreV1.sol:WalletScoreV1",
-            abi.encodeCall(WalletScoreV1.initialize, ())
-        );
+        address proxy =
+            Upgrades.deployUUPSProxy("WalletScoreV1.sol:WalletScoreV1", abi.encodeCall(WalletScoreV1.initialize, ()));
         ws = WalletScoreV1(proxy);
         vm.stopPrank();
     }
@@ -201,18 +199,12 @@ abstract contract WalletScoreTestBase is Test {
 
     // ============ Score Set Helpers ============
 
-    function _createDraftScoreSetAsPublisher1(DomainId domainId, uint256 scoreTimestamp)
-        internal
-        returns (ScoreSetId)
-    {
+    function _createDraftScoreSetAsPublisher1(DomainId domainId, uint256 scoreTimestamp) internal returns (ScoreSetId) {
         vm.prank(publisher1Addr);
         return ws.createScoreSet(domainId, scoreTimestamp);
     }
 
-    function _createDraftScoreSetAsPublisher2(DomainId domainId, uint256 scoreTimestamp)
-        internal
-        returns (ScoreSetId)
-    {
+    function _createDraftScoreSetAsPublisher2(DomainId domainId, uint256 scoreTimestamp) internal returns (ScoreSetId) {
         vm.prank(publisher2Addr);
         return ws.createScoreSet(domainId, scoreTimestamp);
     }
@@ -246,10 +238,7 @@ abstract contract WalletScoreTestBase is Test {
     function _buildSampleEntries(uint256 count) internal pure returns (Entry[] memory) {
         Entry[] memory entries = new Entry[](count);
         for (uint256 i = 0; i < count; i++) {
-            entries[i] = Entry({
-                wallet: address(uint160(0x1000 + i)),
-                score: (count - i) * 1000
-            });
+            entries[i] = Entry({wallet: address(uint160(0x1000 + i)), score: (count - i) * 1000});
         }
         return entries;
     }

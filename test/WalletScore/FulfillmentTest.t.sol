@@ -39,7 +39,8 @@ contract FulfillmentTest is WalletScoreTestBase {
         requestId = ws.createRequest{value: 1 ether}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,
@@ -209,9 +210,7 @@ contract FulfillmentTest is WalletScoreTestBase {
         ScoreSetId draftSet = ws.createScoreSet(domainAvici, block.timestamp);
 
         vm.prank(publisher1Addr);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.ScoreSetDoesNotCoverRequest.selector, draftSet, requestId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.ScoreSetDoesNotCoverRequest.selector, draftSet, requestId));
         ws.fulfillRequest(requestId, draftSet);
     }
 
@@ -220,14 +219,11 @@ contract FulfillmentTest is WalletScoreTestBase {
         entries[0].wallet = wallet1;
         entries[1].wallet = wallet2;
 
-        ScoreSetId futureSet = _createAndPublishScoreSetWithEntries(
-            publisher1Addr, domainAvici, block.timestamp + 2 days, entries
-        );
+        ScoreSetId futureSet =
+            _createAndPublishScoreSetWithEntries(publisher1Addr, domainAvici, block.timestamp + 2 days, entries);
 
         vm.prank(publisher1Addr);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.ScoreSetDoesNotCoverRequest.selector, futureSet, requestId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.ScoreSetDoesNotCoverRequest.selector, futureSet, requestId));
         ws.fulfillRequest(requestId, futureSet);
     }
 
@@ -311,7 +307,8 @@ contract FulfillmentTest is WalletScoreTestBase {
         RequestId newReq = ws.createRequest{value: 1 ether}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,

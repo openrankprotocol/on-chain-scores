@@ -51,9 +51,7 @@ contract PublisherTest is WalletScoreTestBase {
         _registerPublisher1();
 
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.PublisherAddressAlreadyRegistered.selector, publisher1Addr)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.PublisherAddressAlreadyRegistered.selector, publisher1Addr));
         ws.registerPublisher(publisher1Addr, "different-metadata");
     }
 
@@ -81,6 +79,21 @@ contract PublisherTest is WalletScoreTestBase {
 
         Publisher memory pub = ws.getPublisher(publisher1Id);
         assertEq(pub.currentAddress, newAddr);
+    }
+
+    function test_updatePublisherAddress_NotPublisherOrAdmin() public {
+        _registerPublisher1();
+
+        address oldAddr = ws.getPublisher(publisher1Id).currentAddress;
+        address newAddr = makeAddr("newPublisher1Addr");
+        vm.assertNotEq(oldAddr, newAddr);
+
+        vm.prank(publisher2Addr);
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.NotPublisherOrAdmin.selector, publisher1Id));
+        ws.updatePublisherAddress(publisher1Id, newAddr);
+
+        Publisher memory pub = ws.getPublisher(publisher1Id);
+        assertEq(pub.currentAddress, oldAddr);
     }
 
     function test_updatePublisherAddress_UpdatesReverseLookup() public {
@@ -137,9 +150,7 @@ contract PublisherTest is WalletScoreTestBase {
         _registerPublisher2();
 
         vm.prank(publisher1Addr);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.PublisherAddressAlreadyRegistered.selector, publisher2Addr)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.PublisherAddressAlreadyRegistered.selector, publisher2Addr));
         ws.updatePublisherAddress(publisher1Id, publisher2Addr);
     }
 
@@ -322,9 +333,7 @@ contract PublisherTest is WalletScoreTestBase {
         _registerAndFundPublisher1();
 
         vm.prank(publisher1Addr);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.InsufficientBondBalance.selector, 2 ether, DEFAULT_BOND)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.InsufficientBondBalance.selector, 2 ether, DEFAULT_BOND));
         ws.withdrawBond(2 ether);
     }
 
@@ -333,9 +342,7 @@ contract PublisherTest is WalletScoreTestBase {
         _fundAndDepositBondForPublisher1(0.5 ether);
 
         vm.prank(publisher1Addr);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.BondBelowMinimum.selector, 0.05 ether, MIN_BOND)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.BondBelowMinimum.selector, 0.05 ether, MIN_BOND));
         ws.withdrawBond(0.45 ether);
     }
 

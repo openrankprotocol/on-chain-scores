@@ -228,14 +228,183 @@ contract SlashingTest is WalletScoreTestBase {
         _assertRequestStatus(requestId, RequestStatus.Assigned);
     }
 
-    // ============ Lost Bidders ============
+    // ============ Lost Bidder Compensation ============
 
-    function test_advanceRequest_SlashDistribution_WithLostBidders() public {
-        RequestId requestId = _createRequestWithWideWindow(1 ether);
+    /// @notice Test exact slash distribution with one lost bidder
+    /// Scenario: Publisher1 (10 min) selected, Publisher2 (24 min) becomes lost,
+    /// Publisher3 (15 min) becomes next bidder
+    /// Distribution: 20% treasury, 50% to lost bidder (Publisher2), 30% to next (Publisher3)
+    function test_lostBidder_SingleLostBidder_ExactDistribution() public {
+        // Create request with tight window: quoting +60min, fulfillment +90min
+        // After quoting (at ~60min), only 30 min left until deadline
+        RequestId requestId = _createRequestForLostBidderTest(1 ether);
 
-        _submitBidAsPublisher1(requestId, 0.3 ether, 20 minutes);
-        _submitBidAsPublisher2(requestId, 0.4 ether, 50 minutes);
-        _submitBidAsPublisher3(requestId, 0.5 ether, 70 minutes);
+        // Publisher1: cheapest, 10 min duration (will be selected)
+        BidId bid1 = _submitBidAsPublisher1(requestId, 0.3 ether, 10 minutes);
+        // Publisher2: 24 min promise (valid at selection: 60+24=84 < 90, lost at 70: 70+24=94 >= 90)
+        _submitBidAsPublisher2(requestId, 0.4 ether, 24 minutes);
+        // Publisher3: 15 min promise (valid at selection and after: 70+15=85 < 90)
+        _submitBidAsPublisher3(requestId, 0.5 ether, 15 minutes);
+
+        _advancePastQuotingDeadline(requestId);
+        ws.advanceRequest(requestId);
+
+        // Record state before slash
+        uint256 pub2BondBefore = ws.getPublisherBond(publisher2Id);
+        uint256 pub3BondBefore = ws.getPublisherBond(publisher3Id);
+        uint256 treasuryBefore = ws.getTreasuryBalance();
+
+        // Publisher1 fails after their promised duration
+        // At this point Publisher2 can no longer fulfill (24 min > remaining ~20 min)
+        // Publisher3 still can (15 min < remaining ~20 min)
+        _advancePastBidDeadline(bid1);
+        ws.advanceRequest(requestId);
+
+        // Slash = 0.3 ether / 2 = 0.15 ether
+        uint256 slashAmount = 0.15 ether;
+        uint256 expectedTreasury = (slashAmount * 20) / 100; // 0.03 ether
+        uint256 expectedLostBidders = (slashAmount * 50) / 100; // 0.075 ether
+        uint256 expectedNext = slashAmount - expectedTreasury - expectedLostBidders; // 0.045 ether
+
+        // Verify treasury received 20%
+        assertEq(ws.getTreasuryBalance(), treasuryBefore + expectedTreasury, "Treasury should receive 20% of slash");
+
+        // Verify Publisher2 (lost bidder) received 50%
+        assertEq(
+            ws.getPublisherBond(publisher2Id),
+            pub2BondBefore + expectedLostBidders,
+            "Lost bidder should receive 50% of slash"
+        );
+
+        // Verify Publisher3 (next bidder) received 30%
+        assertEq(
+            ws.getPublisherBond(publisher3Id), pub3BondBefore + expectedNext, "Next bidder should receive 30% of slash"
+        );
+    }
+
+    /// @notice Test proportional distribution among multiple lost bidders
+    /// Distribution to lost bidders is proportional to their quoted prices
+    function test_lostBidder_MultipleLostBidders_ProportionalDistribution() public {
+        // Tight window: quoting +60min, fulfillment +90min
+        RequestId requestId = _createRequestForLostBidderTest(1 ether);
+
+        // Publisher1: 5 min promise (will be selected)
+        BidId bid1 = _submitBidAsPublisher1(requestId, 0.2 ether, 5 minutes);
+        // Publisher2: 28 min promise, quoted 0.3 ether (valid at 60: 88<90, lost at 65: 93>=90)
+        _submitBidAsPublisher2(requestId, 0.3 ether, 28 minutes);
+        // Publisher3: 26 min promise, quoted 0.6 ether (valid at 60: 86<90, lost at 65: 91>=90)
+        _submitBidAsPublisher3(requestId, 0.6 ether, 26 minutes);
+
+        _advancePastQuotingDeadline(requestId);
+        ws.advanceRequest(requestId);
+
+        uint256 pub2BondBefore = ws.getPublisherBond(publisher2Id);
+        uint256 pub3BondBefore = ws.getPublisherBond(publisher3Id);
+
+        // Publisher1 fails after their promised duration, both Publisher2 and Publisher3 become lost
+        // (no next bidder available)
+        _advancePastBidDeadline(bid1);
+        ws.advanceRequest(requestId);
+
+        // Slash = 0.2 ether / 2 = 0.1 ether
+        uint256 slashAmount = 0.1 ether;
+        uint256 toLostBidders = (slashAmount * 50) / 100; // 0.05 ether
+
+        // Proportional distribution based on quoted prices:
+        // Publisher2 quoted 0.3, Publisher3 quoted 0.6, total = 0.9 ether
+        // Publisher2 share: 0.05 * (0.3 / 0.9) = 0.05 * 1/3 ≈ 0.0166 ether
+        // Publisher3 share: 0.05 * (0.6 / 0.9) = 0.05 * 2/3 ≈ 0.0333 ether
+        uint256 totalQuoted = 0.9 ether;
+        uint256 pub2ExpectedShare = (toLostBidders * 0.3 ether) / totalQuoted;
+        uint256 pub3ExpectedShare = toLostBidders - pub2ExpectedShare; // remainder to avoid rounding
+
+        uint256 pub2BondAfter = ws.getPublisherBond(publisher2Id);
+        uint256 pub3BondAfter = ws.getPublisherBond(publisher3Id);
+
+        // Check proportional distribution (allowing 1 wei tolerance for rounding)
+        assertApproxEqAbs(
+            pub2BondAfter - pub2BondBefore, pub2ExpectedShare, 1, "Publisher2 should receive proportional share"
+        );
+        assertApproxEqAbs(
+            pub3BondAfter - pub3BondBefore,
+            pub3ExpectedShare,
+            1,
+            "Publisher3 should receive proportional share (remainder)"
+        );
+
+        // Verify total distributed equals 50% of slash
+        uint256 totalDistributed = (pub2BondAfter - pub2BondBefore) + (pub3BondAfter - pub3BondBefore);
+        assertEq(totalDistributed, toLostBidders, "Total to lost bidders should be 50% of slash");
+    }
+
+    /// @notice End-to-end: Lost bidder gets compensation, next bidder fulfills
+    function test_lostBidder_CompensationThenFulfillment() public {
+        // Tight window: quoting +60min, fulfillment +90min
+        RequestId requestId = _createRequestForLostBidderTest(1 ether);
+
+        // Publisher1: 10 min (selected, will fail)
+        BidId bid1 = _submitBidAsPublisher1(requestId, 0.3 ether, 10 minutes);
+        // Publisher2: 24 min (will become lost: 70+24=94 >= 90)
+        _submitBidAsPublisher2(requestId, 0.4 ether, 24 minutes);
+        // Publisher3: 15 min (will become next: 70+15=85 < 90)
+        _submitBidAsPublisher3(requestId, 0.5 ether, 15 minutes);
+
+        _advancePastQuotingDeadline(requestId);
+        ws.advanceRequest(requestId);
+
+        uint256 pub2BondBefore = ws.getPublisherBond(publisher2Id);
+        uint256 pub3BondBefore = ws.getPublisherBond(publisher3Id);
+        uint256 pub3WithdrawableBefore = ws.getWithdrawable(publisher3Addr);
+
+        // Publisher1 fails after their promised duration, Publisher2 becomes lost, Publisher3 becomes next
+        _advancePastBidDeadline(bid1);
+        ws.advanceRequest(requestId);
+
+        // Verify Publisher2 got lost bidder compensation (50%)
+        uint256 slashAmount = 0.15 ether;
+        uint256 expectedLostCompensation = (slashAmount * 50) / 100;
+        assertEq(
+            ws.getPublisherBond(publisher2Id),
+            pub2BondBefore + expectedLostCompensation,
+            "Lost bidder (Publisher2) should receive 50% compensation"
+        );
+
+        // Verify Publisher3 got next bidder bonus (30%)
+        uint256 expectedNextBonus = slashAmount - (slashAmount * 20) / 100 - expectedLostCompensation;
+        assertEq(
+            ws.getPublisherBond(publisher3Id),
+            pub3BondBefore + expectedNextBonus,
+            "Next bidder (Publisher3) should receive 30% bonus to bond"
+        );
+
+        // Publisher3 fulfills
+        _fulfillAsPublisher3(requestId);
+
+        // Publisher3 should receive their quoted fee
+        assertEq(
+            ws.getWithdrawable(publisher3Addr),
+            pub3WithdrawableBefore + 0.5 ether,
+            "Publisher3 should receive quoted fee after fulfillment"
+        );
+
+        _assertRequestStatus(requestId, RequestStatus.Fulfilled);
+    }
+
+    /// @notice Verify configurable slash distribution parameters work correctly
+    function test_lostBidder_ConfigurableDistributionParams() public {
+        // Change distribution to: 10% treasury, 70% lost bidders, 20% next
+        vm.prank(admin);
+        ws.setSlashDistributionParams(40, 10, 70); // (noLost treasury, withLost treasury, lostBidders)
+
+        // Tight window for lost bidder scenario
+        RequestId requestId = _createRequestForLostBidderTest(1 ether);
+
+        // Publisher1: 10 min (selected)
+        BidId bid1 = _submitBidAsPublisher1(requestId, 0.4 ether, 10 minutes);
+        // Publisher2: 24 min (will become lost)
+        _submitBidAsPublisher2(requestId, 0.5 ether, 24 minutes);
+        // Publisher3: 15 min (will become next)
+        _submitBidAsPublisher3(requestId, 0.6 ether, 15 minutes);
 
         _advancePastQuotingDeadline(requestId);
         ws.advanceRequest(requestId);
@@ -244,17 +413,19 @@ contract SlashingTest is WalletScoreTestBase {
         uint256 pub3BondBefore = ws.getPublisherBond(publisher3Id);
         uint256 treasuryBefore = ws.getTreasuryBalance();
 
-        skip(45 minutes);
+        // Publisher1 fails after their promised duration
+        _advancePastBidDeadline(bid1);
         ws.advanceRequest(requestId);
 
-        uint256 slashAmount = 0.3 ether / 2;
-        uint256 toTreasury = (slashAmount * 20) / 100;
+        // Slash = 0.4 / 2 = 0.2 ether
+        uint256 slashAmount = 0.2 ether;
+        uint256 expectedTreasury = (slashAmount * 10) / 100; // 10% = 0.02 ether
+        uint256 expectedLost = (slashAmount * 70) / 100; // 70% = 0.14 ether
+        uint256 expectedNext = slashAmount - expectedTreasury - expectedLost; // 20% = 0.04 ether
 
-        assertGe(ws.getTreasuryBalance(), treasuryBefore + toTreasury - 1);
-
-        uint256 pub2BondAfter = ws.getPublisherBond(publisher2Id);
-        uint256 pub3BondAfter = ws.getPublisherBond(publisher3Id);
-        assertTrue(pub2BondAfter > pub2BondBefore || pub3BondAfter > pub3BondBefore);
+        assertEq(ws.getTreasuryBalance(), treasuryBefore + expectedTreasury, "Custom treasury %");
+        assertEq(ws.getPublisherBond(publisher2Id), pub2BondBefore + expectedLost, "Custom lost bidder %");
+        assertEq(ws.getPublisherBond(publisher3Id), pub3BondBefore + expectedNext, "Custom next bidder %");
     }
 
     // ============ Multiple Failures ============
@@ -339,6 +510,138 @@ contract SlashingTest is WalletScoreTestBase {
         ws.withdrawTreasury(admin, 1 ether);
     }
 
+    // ============ Recovery Scenarios (End-to-End) ============
+
+    /// @notice First bidder fails, second bidder fulfills and earns fee + slash spillover
+    function test_recovery_FirstFailsSecondFulfills() public {
+        // Create request with enough time for multiple bidders
+        RequestId requestId = _createRequestWithLongerWindow(1 ether);
+
+        // Publisher1 bids cheaper (will be selected first), Publisher2 bids higher
+        BidId bid1 = _submitBidAsPublisher1(requestId, 0.4 ether, 30 minutes);
+        BidId bid2 = _submitBidAsPublisher2(requestId, 0.5 ether, 30 minutes);
+
+        // Advance past quoting, select cheapest bidder (Publisher1)
+        _advancePastQuotingDeadline(requestId);
+        ws.advanceRequest(requestId);
+
+        _assertBidStatus(bid1, BidStatus.Selected);
+        _assertBidStatus(bid2, BidStatus.Pending);
+
+        // Record Publisher2's state before slash
+        uint256 pub2BondBefore = ws.getPublisherBond(publisher2Id);
+        uint256 pub2WithdrawableBefore = ws.getWithdrawable(publisher2Addr);
+
+        // Publisher1 fails to deliver
+        _advancePastBidDeadline(bid1);
+        ws.advanceRequest(requestId);
+
+        // Publisher1 slashed, Publisher2 selected as next bidder
+        _assertBidStatus(bid1, BidStatus.Failed);
+        _assertBidStatus(bid2, BidStatus.Selected);
+
+        // Publisher2 received slash spillover: 60% of (0.4 ether / 2) = 0.12 ether
+        assertEq(
+            ws.getPublisherBond(publisher2Id), pub2BondBefore + 0.12 ether, "Publisher2 should receive slash spillover"
+        );
+
+        // Publisher2 creates score set and fulfills
+        _fulfillAsPublisher2(requestId);
+
+        // Verify final state
+        _assertRequestStatus(requestId, RequestStatus.Fulfilled);
+        _assertBidStatus(bid2, BidStatus.Won);
+
+        // Publisher2 should have: original bond + slash spillover (bond), + bid price (withdrawable)
+        assertEq(
+            ws.getWithdrawable(publisher2Addr),
+            pub2WithdrawableBefore + 0.5 ether,
+            "Publisher2 should receive their quoted fee"
+        );
+    }
+
+    /// @notice First and second bidders fail, third bidder fulfills and earns fee + slash spillovers
+    function test_recovery_FirstAndSecondFailThirdFulfills() public {
+        // Create request with wide window to accommodate 3 bidders failing sequentially
+        RequestId requestId = _createRequestWithWideWindow(1 ether);
+
+        // Three bidders with increasing prices
+        BidId bid1 = _submitBidAsPublisher1(requestId, 0.3 ether, 30 minutes);
+        BidId bid2 = _submitBidAsPublisher2(requestId, 0.4 ether, 30 minutes);
+        BidId bid3 = _submitBidAsPublisher3(requestId, 0.5 ether, 30 minutes);
+
+        // Advance past quoting, Publisher1 selected
+        _advancePastQuotingDeadline(requestId);
+        ws.advanceRequest(requestId);
+        _assertBidStatus(bid1, BidStatus.Selected);
+
+        uint256 pub2BondBefore = ws.getPublisherBond(publisher2Id);
+
+        // Publisher1 fails → Publisher2 selected, receives 60% of slash1
+        _advancePastBidDeadline(bid1);
+        ws.advanceRequest(requestId);
+
+        _assertBidStatus(bid1, BidStatus.Failed);
+        _assertBidStatus(bid2, BidStatus.Selected);
+
+        // Publisher2 received 60% of slash1: 60% of (0.3 ether / 2) = 0.09 ether
+        assertEq(
+            ws.getPublisherBond(publisher2Id), pub2BondBefore + 0.09 ether, "Publisher2 should receive slash1 spillover"
+        );
+
+        // Record Publisher3's state before second slash
+        uint256 pub3BondBefore = ws.getPublisherBond(publisher3Id);
+        uint256 pub3WithdrawableBefore = ws.getWithdrawable(publisher3Addr);
+
+        // Publisher2 also fails → Publisher3 selected, receives 60% of slash2
+        _advancePastBidDeadline(bid2);
+        ws.advanceRequest(requestId);
+
+        _assertBidStatus(bid2, BidStatus.Failed);
+        _assertBidStatus(bid3, BidStatus.Selected);
+
+        // Publisher3 received 60% of slash2: 60% of (0.4 ether / 2) = 0.12 ether
+        assertEq(
+            ws.getPublisherBond(publisher3Id), pub3BondBefore + 0.12 ether, "Publisher3 should receive slash2 spillover"
+        );
+
+        // Publisher3 creates score set and fulfills
+        _fulfillAsPublisher3(requestId);
+
+        // Verify final state
+        _assertRequestStatus(requestId, RequestStatus.Fulfilled);
+        _assertBidStatus(bid3, BidStatus.Won);
+
+        // Publisher3 should receive their quoted fee
+        assertEq(
+            ws.getWithdrawable(publisher3Addr),
+            pub3WithdrawableBefore + 0.5 ether,
+            "Publisher3 should receive their quoted fee"
+        );
+
+        // Verify requester got refund of excess budget
+        // Budget was 1 ether, Publisher3 charged 0.5 ether → 0.5 ether refund
+        assertGe(ws.getWithdrawable(requester1), 0.5 ether, "Requester should receive at least the excess budget");
+    }
+
+    function _fulfillAsPublisher2(RequestId requestId) internal {
+        Entry[] memory entries = _buildSampleEntries(1);
+        entries[0].wallet = wallet1;
+        ScoreSetId scoreSetId =
+            _createAndPublishScoreSetWithEntries(publisher2Addr, domainAvici, block.timestamp, entries);
+        vm.prank(publisher2Addr);
+        ws.fulfillRequest(requestId, scoreSetId);
+    }
+
+    function _fulfillAsPublisher3(RequestId requestId) internal {
+        Entry[] memory entries = _buildSampleEntries(1);
+        entries[0].wallet = wallet1;
+        ScoreSetId scoreSetId =
+            _createAndPublishScoreSetWithEntries(publisher3Addr, domainAvici, block.timestamp, entries);
+        vm.prank(publisher3Addr);
+        ws.fulfillRequest(requestId, scoreSetId);
+    }
+
     // ============ Helpers ============
 
     function _createRequestWithLongerWindow(uint256 budget) internal returns (RequestId) {
@@ -348,7 +651,8 @@ contract SlashingTest is WalletScoreTestBase {
         return ws.createRequest{value: budget}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,
@@ -364,7 +668,8 @@ contract SlashingTest is WalletScoreTestBase {
         return ws.createRequest{value: budget}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,
@@ -380,11 +685,31 @@ contract SlashingTest is WalletScoreTestBase {
         return ws.createRequest{value: budget}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,
             block.timestamp + 4 hours,
+            BidSelection.Cheapest
+        );
+    }
+
+    /// @notice Creates a request with a tight window designed for lost bidder testing
+    /// Quoting: +60min, Fulfillment: +90min (only 30min after quoting)
+    function _createRequestForLostBidderTest(uint256 budget) internal returns (RequestId) {
+        address[] memory wallets = _singleWalletArray(wallet1);
+
+        vm.prank(requester1);
+        return ws.createRequest{value: budget}(
+            domainAvici,
+            wallets,
+            0,
+            0,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
+            block.timestamp + 60 minutes,
+            block.timestamp + 90 minutes,
             BidSelection.Cheapest
         );
     }

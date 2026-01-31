@@ -77,14 +77,24 @@ contract RequestTest is WalletScoreTestBase {
         address[] memory wallets = _singleWalletArray(address(0x1000));
 
         RequestId id1 = _createWalletRequest(
-            requester1, domainAvici, wallets,
-            block.timestamp - 1 days, block.timestamp + 1 days,
-            block.timestamp + 1 hours, block.timestamp + 2 hours, 0.1 ether
+            requester1,
+            domainAvici,
+            wallets,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
+            block.timestamp + 1 hours,
+            block.timestamp + 2 hours,
+            0.1 ether
         );
         RequestId id2 = _createWalletRequest(
-            requester1, domainAvici, wallets,
-            block.timestamp - 1 days, block.timestamp + 1 days,
-            block.timestamp + 1 hours, block.timestamp + 2 hours, 0.1 ether
+            requester1,
+            domainAvici,
+            wallets,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
+            block.timestamp + 1 hours,
+            block.timestamp + 2 hours,
+            0.1 ether
         );
 
         assertEq(RequestId.unwrap(id1), 1);
@@ -95,9 +105,14 @@ contract RequestTest is WalletScoreTestBase {
         address[] memory wallets = _twoWalletArray(address(0x1000), address(0x1001));
 
         RequestId id = _createWalletRequest(
-            requester1, domainAvici, wallets,
-            block.timestamp - 1 days, block.timestamp + 1 days,
-            block.timestamp + 1 hours, block.timestamp + 2 hours, 0.5 ether
+            requester1,
+            domainAvici,
+            wallets,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
+            block.timestamp + 1 hours,
+            block.timestamp + 2 hours,
+            0.5 ether
         );
 
         ScoreRequest memory req = ws.getRequest(id);
@@ -136,7 +151,8 @@ contract RequestTest is WalletScoreTestBase {
         RequestId id = ws.createRequest{value: 0.5 ether}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,
@@ -158,9 +174,12 @@ contract RequestTest is WalletScoreTestBase {
         ws.createRequest{value: 0.5 ether}(
             domainUnregistered,
             wallets,
-            0, 0,
-            block.timestamp - 1 days, block.timestamp + 1 days,
-            block.timestamp + 1 hours, block.timestamp + 2 hours,
+            0,
+            0,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
+            block.timestamp + 1 hours,
+            block.timestamp + 2 hours,
             BidSelection.Cheapest
         );
     }
@@ -171,9 +190,12 @@ contract RequestTest is WalletScoreTestBase {
         ws.createRequest{value: 0.5 ether}(
             domainAvici,
             new address[](0),
-            0, 0,
-            block.timestamp - 1 days, block.timestamp + 1 days,
-            block.timestamp + 1 hours, block.timestamp + 2 hours,
+            0,
+            0,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
+            block.timestamp + 1 hours,
+            block.timestamp + 2 hours,
             BidSelection.Cheapest
         );
     }
@@ -184,16 +206,16 @@ contract RequestTest is WalletScoreTestBase {
         vm.prank(requester1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IWalletScore.InvalidDeadlines.selector,
-                block.timestamp - 1,
-                block.timestamp + 2 hours
+                IWalletScore.InvalidDeadlines.selector, block.timestamp - 1, block.timestamp + 2 hours
             )
         );
         ws.createRequest{value: 0.5 ether}(
             domainAvici,
             wallets,
-            0, 0,
-            block.timestamp - 1 days, block.timestamp + 1 days,
+            0,
+            0,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
             block.timestamp - 1,
             block.timestamp + 2 hours,
             BidSelection.Cheapest
@@ -206,16 +228,16 @@ contract RequestTest is WalletScoreTestBase {
         vm.prank(requester1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IWalletScore.InvalidDeadlines.selector,
-                block.timestamp + 2 hours,
-                block.timestamp + 1 hours
+                IWalletScore.InvalidDeadlines.selector, block.timestamp + 2 hours, block.timestamp + 1 hours
             )
         );
         ws.createRequest{value: 0.5 ether}(
             domainAvici,
             wallets,
-            0, 0,
-            block.timestamp - 1 days, block.timestamp + 1 days,
+            0,
+            0,
+            block.timestamp - 1 days,
+            block.timestamp + 1 days,
             block.timestamp + 2 hours,
             block.timestamp + 1 hours,
             BidSelection.Cheapest
@@ -278,9 +300,7 @@ contract RequestTest is WalletScoreTestBase {
         _assertRequestStatus(id, RequestStatus.Assigned);
 
         vm.prank(requester1);
-        vm.expectRevert(
-            abi.encodeWithSelector(IWalletScore.RequestNotCancellable.selector, id, RequestStatus.Assigned)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IWalletScore.RequestNotCancellable.selector, id, RequestStatus.Assigned));
         ws.cancelRequest(id);
     }
 

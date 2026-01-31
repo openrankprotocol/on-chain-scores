@@ -3,14 +3,7 @@ pragma solidity ^0.8.13;
 
 import {WalletScoreTestBase} from "./WalletScoreTestBase.sol";
 import {IWalletScore} from "src/WalletScore/IWalletScore.sol";
-import {
-    DomainId,
-    ScoreSetId,
-    PublisherId,
-    ScoreSetStatus,
-    ScoreSetMeta,
-    Entry
-} from "src/WalletScore/Types.sol";
+import {DomainId, ScoreSetId, PublisherId, ScoreSetStatus, ScoreSetMeta, Entry} from "src/WalletScore/Types.sol";
 
 contract ScoreSetTest is WalletScoreTestBase {
     function setUp() public override {

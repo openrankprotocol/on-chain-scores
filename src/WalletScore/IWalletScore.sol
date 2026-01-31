@@ -43,14 +43,22 @@ interface IWalletScore {
         RequestId indexed requestId, address indexed requester, DomainId indexed domainId, uint256 maxBudget
     );
     event BidSubmitted(
-        BidId indexed bidId, RequestId indexed requestId, PublisherId indexed publisher, uint256 price, uint256 promisedDuration
+        BidId indexed bidId,
+        RequestId indexed requestId,
+        PublisherId indexed publisher,
+        uint256 price,
+        uint256 promisedDuration
     );
     event BidSelected(RequestId indexed requestId, BidId indexed bidId, PublisherId indexed publisher);
     event RequestFulfilled(
         RequestId indexed requestId, ScoreSetId indexed scoreSetId, PublisherId indexed publisher, uint256 payout
     );
     event BidderFailed(
-        RequestId indexed requestId, BidId indexed bidId, PublisherId indexed publisher, uint256 slashAmount, uint256 denylistUntil
+        RequestId indexed requestId,
+        BidId indexed bidId,
+        PublisherId indexed publisher,
+        uint256 slashAmount,
+        uint256 denylistUntil
     );
     event RequestFailed(RequestId indexed requestId);
     event RequestCancelled(RequestId indexed requestId);
@@ -111,6 +119,9 @@ interface IWalletScore {
     error InsufficientTreasuryBalance(uint256 requested, uint256 available);
     error TransferFailed(address to, uint256 amount);
 
+    // Parameter errors
+    error InvalidSlashDistributionParams(uint256 total);
+
     // ============ Admin Functions ============
 
     /// @notice Registers a new domain.
@@ -136,6 +147,13 @@ interface IWalletScore {
 
     /// @notice Sets denylist calculation parameters.
     function setDenylistParams(uint256 baseDuration, uint256 perLostBidder, uint256 valueDivisor) external;
+
+    /// @notice Sets slash distribution percentages.
+    /// @param treasuryPctNoLost Treasury percentage when no lost bidders (0-100)
+    /// @param treasuryPctWithLost Treasury percentage when lost bidders exist (0-100)
+    /// @param lostBiddersPct Lost bidders percentage (0-100); must satisfy treasuryPctWithLost + lostBiddersPct <= 100
+    function setSlashDistributionParams(uint256 treasuryPctNoLost, uint256 treasuryPctWithLost, uint256 lostBiddersPct)
+        external;
 
     /// @notice Withdraws from treasury. Admin only.
     function withdrawTreasury(address to, uint256 amount) external;
@@ -248,6 +266,15 @@ interface IWalletScore {
         external
         view
         returns (uint256 baseDuration, uint256 perLostBidder, uint256 valueDivisor);
+
+    /// @notice Gets slash distribution parameters.
+    /// @return treasuryPctNoLost Treasury percentage when no lost bidders
+    /// @return treasuryPctWithLost Treasury percentage when lost bidders exist
+    /// @return lostBiddersPct Lost bidders percentage (next bidder gets remainder)
+    function getSlashDistributionParams()
+        external
+        view
+        returns (uint256 treasuryPctNoLost, uint256 treasuryPctWithLost, uint256 lostBiddersPct);
 
     /// @notice Gets withdrawable balance for an address (refunds, slash distributions).
     function getWithdrawable(address addr) external view returns (uint256);

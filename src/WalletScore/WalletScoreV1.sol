@@ -63,6 +63,11 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
     uint256 private _denylistPerLostBidder;
     uint256 private _denylistValueDivisor;
 
+    // Slash distribution parameters (percentages out of 100)
+    uint256 private _slashTreasuryPctNoLost; // treasury % when no lost bidders (default 40)
+    uint256 private _slashTreasuryPctWithLost; // treasury % when lost bidders exist (default 20)
+    uint256 private _slashLostBiddersPct; // lost bidders % (default 50); next bidder gets remainder
+
     // Treasury & withdrawable
     uint256 private _treasuryBalance;
     mapping(address => uint256) private _withdrawable;
@@ -92,6 +97,11 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         _denylistBaseDuration = 1 days;
         _denylistPerLostBidder = 1 hours;
         _denylistValueDivisor = 1 ether; // 1 hour per ether of lost value
+
+        // Default slash distribution parameters
+        _slashTreasuryPctNoLost = 40; // 40% to treasury when no lost bidders
+        _slashTreasuryPctWithLost = 20; // 20% to treasury when lost bidders exist
+        _slashLostBiddersPct = 50; // 50% to lost bidders; next bidder gets 30%
     }
 
     function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
@@ -231,6 +241,23 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         _denylistBaseDuration = baseDuration;
         _denylistPerLostBidder = perLostBidder;
         _denylistValueDivisor = valueDivisor;
+    }
+
+    /// @inheritdoc IWalletScore
+    function setSlashDistributionParams(uint256 treasuryPctNoLost, uint256 treasuryPctWithLost, uint256 lostBiddersPct)
+        external
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (treasuryPctNoLost > 100) {
+            revert InvalidSlashDistributionParams(treasuryPctNoLost);
+        }
+        if (treasuryPctWithLost + lostBiddersPct > 100) {
+            revert InvalidSlashDistributionParams(treasuryPctWithLost + lostBiddersPct);
+        }
+        _slashTreasuryPctNoLost = treasuryPctNoLost;
+        _slashTreasuryPctWithLost = treasuryPctWithLost;
+        _slashLostBiddersPct = lostBiddersPct;
     }
 
     /// @inheritdoc IWalletScore
@@ -772,9 +799,10 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         uint256 toNext;
 
         if (lostBidders.length > 0) {
-            toTreasury = (slashAmount * 20) / 100;
-            toLostBidders = (slashAmount * 50) / 100;
-            toNext = slashAmount - toTreasury - toLostBidders; // 30%
+            // With lost bidders: split among treasury, lost bidders, and next bidder
+            toTreasury = (slashAmount * _slashTreasuryPctWithLost) / 100;
+            toLostBidders = (slashAmount * _slashLostBiddersPct) / 100;
+            toNext = slashAmount - toTreasury - toLostBidders;
 
             // Distribute to lost bidders proportionally, credit to bond
             uint256 totalQuoted = 0;
@@ -795,9 +823,9 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
                 distributed += share;
             }
         } else {
-            // No lost bidders: 2:3 split (40% treasury, 60% next/requester)
-            toTreasury = (slashAmount * 40) / 100;
-            toNext = slashAmount - toTreasury; // 60%
+            // No lost bidders: split between treasury and next bidder/requester
+            toTreasury = (slashAmount * _slashTreasuryPctNoLost) / 100;
+            toNext = slashAmount - toTreasury;
             toLostBidders = 0;
         }
 
@@ -935,7 +963,12 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
     }
 
     /// @inheritdoc IWalletScore
-    function getRankAndScore(ScoreSetId id, address wallet) external view override returns (uint256 rank, uint256 score) {
+    function getRankAndScore(ScoreSetId id, address wallet)
+        external
+        view
+        override
+        returns (uint256 rank, uint256 score)
+    {
         if (ScoreSetId.unwrap(id) == 0 || _scoreSetMeta[id].scoreTimestamp == 0) {
             revert ScoreSetNotFound(id);
         }
@@ -1084,6 +1117,16 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         returns (uint256 baseDuration, uint256 perLostBidder, uint256 valueDivisor)
     {
         return (_denylistBaseDuration, _denylistPerLostBidder, _denylistValueDivisor);
+    }
+
+    /// @inheritdoc IWalletScore
+    function getSlashDistributionParams()
+        external
+        view
+        override
+        returns (uint256 treasuryPctNoLost, uint256 treasuryPctWithLost, uint256 lostBiddersPct)
+    {
+        return (_slashTreasuryPctNoLost, _slashTreasuryPctWithLost, _slashLostBiddersPct);
     }
 
     /// @inheritdoc IWalletScore

@@ -132,9 +132,7 @@ contract BiddingTest is WalletScoreTestBase {
 
         vm.prank(publisher1Addr);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IWalletScore.PublisherIsDenylisted.selector, publisher1Id, block.timestamp + 1 days
-            )
+            abi.encodeWithSelector(IWalletScore.PublisherIsDenylisted.selector, publisher1Id, block.timestamp + 1 days)
         );
         ws.submitBid(requestId, 0.5 ether, 30 minutes);
     }
@@ -324,7 +322,8 @@ contract BiddingTest is WalletScoreTestBase {
         return ws.createRequest{value: 1 ether}(
             domainAvici,
             wallets,
-            0, 0,
+            0,
+            0,
             block.timestamp - 1 days,
             block.timestamp + 1 days,
             block.timestamp + 1 hours,
@@ -334,16 +333,14 @@ contract BiddingTest is WalletScoreTestBase {
     }
 
     function _denylistPublisher1For(uint256 duration) internal {
-        vm.store(
-            address(ws),
-            _getPublisherDenylistSlot(publisher1Id),
-            bytes32(block.timestamp + duration)
-        );
+        vm.store(address(ws), _getPublisherDenylistSlot(publisher1Id), bytes32(block.timestamp + duration));
     }
 
     function _getPublisherDenylistSlot(PublisherId pubId) internal pure returns (bytes32) {
-        uint256 publishersSlot = 2;
+        // _publishers mapping is at storage slot 1
+        uint256 publishersSlot = 1;
         bytes32 publisherBaseSlot = keccak256(abi.encode(PublisherId.unwrap(pubId), publishersSlot));
+        // denylistUntil is the 4th field (index 3) in the Publisher struct
         return bytes32(uint256(publisherBaseSlot) + 3);
     }
 }
