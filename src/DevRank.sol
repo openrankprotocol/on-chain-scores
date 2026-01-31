@@ -30,7 +30,6 @@ contract DevRankV1 is IDevRank, Initializable, UUPSUpgradeable, OwnableUpgradeab
     /// @dev Only for the proxy to call exactly once at deploy time.
     function initialize() public initializer {
         __Ownable_init(msg.sender);
-        __UUPSUpgradeable_init();
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

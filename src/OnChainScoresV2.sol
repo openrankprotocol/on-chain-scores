@@ -37,7 +37,6 @@ contract OnChainScoresV2 is IFarcasterOpenRank, Initializable, UUPSUpgradeable, 
     /// @dev Only for the proxy to call exactly once at deploy time.
     function initialize() public initializer {
         __Ownable_init(msg.sender);
-        __UUPSUpgradeable_init();
     }
 
     function setFidLookup(IVerificationsV4Reader _fidLookup) public onlyOwner {

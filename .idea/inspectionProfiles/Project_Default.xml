@@ -24,5 +24,8 @@
       <option name="processLiterals" value="true" />
       <option name="processComments" value="true" />
     </inspection_tool>
+    <inspection_tool class="UnusedElement" enabled="true" level="WEAK WARNING" enabled_by_default="true" />
+    <inspection_tool class="ValidateEmitEventArguments" enabled="true" level="ERROR" enabled_by_default="true" />
+    <inspection_tool class="ValidateFunctionArguments" enabled="true" level="ERROR" enabled_by_default="true" />
   </profile>
 </component>
