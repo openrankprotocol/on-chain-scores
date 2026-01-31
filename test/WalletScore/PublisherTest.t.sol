@@ -28,7 +28,8 @@ contract PublisherTest is WalletScoreTestBase {
 
     function test_registerPublisher_EmitsPublisherRegistered() public {
         vm.expectEmit(true, true, false, true);
-        emit IWalletScore.PublisherRegistered(PublisherId.wrap(1), publisher1Addr, PUBLISHER_METADATA);
+        PublisherId publisher1Id = PublisherId.wrap(1);
+        emit IWalletScore.PublisherRegistered(publisher1Id, publisher1Addr, PUBLISHER_METADATA);
 
         vm.prank(admin);
         ws.registerPublisher(publisher1Addr, PUBLISHER_METADATA);
