@@ -146,6 +146,10 @@ interface IWalletScore {
     function setMinPublisherBond(uint256 amount) external;
 
     /// @notice Sets denylist calculation parameters.
+    /// @dev Denylist duration = baseDuration + (lostBidderCount × perLostBidder) + (totalLostValue ÷ valueDivisor)
+    /// @param baseDuration Base duration in seconds (default: 1 day)
+    /// @param perLostBidder Additional seconds per lost bidder (default: 1 hour)
+    /// @param valueDivisor Divisor for lost value contribution (default: 1 ether = 1 hour per ether)
     function setDenylistParams(uint256 baseDuration, uint256 perLostBidder, uint256 valueDivisor) external;
 
     /// @notice Sets slash distribution percentages.
@@ -262,6 +266,9 @@ interface IWalletScore {
     function getMinPublisherBond() external view returns (uint256);
 
     /// @notice Gets denylist parameters.
+    /// @return baseDuration Base duration in seconds
+    /// @return perLostBidder Additional seconds per lost bidder
+    /// @return valueDivisor Divisor for lost value contribution to duration
     function getDenylistParams()
         external
         view

@@ -170,20 +170,28 @@ When a bidder fails to fulfill within their promised duration:
 
 ### Slash Distribution
 
-**With lost bidders** (bidders who were valid when failed bidder was selected but are now invalid):
+When a bidder fails, their slashed funds are distributed among three possible recipients: treasury, lost bidders, and the next bidder (or requester if no valid bidders remain). The distribution percentages are configurable via `setSlashDistributionParams()`.
 
-| Recipient | Share | Notes |
-|-----------|-------|-------|
-| Treasury | 20% | Protocol revenue |
-| Lost bidders | 50% | Proportional to quoted price, credited to bond |
-| Next bidder | 30% | Incentive to step up |
+**With lost bidders** (bidders whose bids were valid when the failed bidder was selected but are now invalid due to timing):
+
+| Recipient | Default | Notes |
+|-----------|---------|-------|
+| Treasury | 20% | Protocol revenue (`treasuryPctWithLost`) |
+| Lost bidders | 50% | Proportional to quoted price, credited to bond (`lostBiddersPct`) |
+| Next bidder | 30% | Incentive to step up (remainder: `100 - treasuryPctWithLost - lostBiddersPct`) |
 
 **Without lost bidders**:
 
-| Recipient | Share |
-|-----------|-------|
-| Treasury | 40% |
-| Next bidder / requester | 60% |
+| Recipient | Default | Notes |
+|-----------|---------|-------|
+| Treasury | 40% | Protocol revenue (`treasuryPctNoLost`) |
+| Next bidder / requester | 60% | Remainder: `100 - treasuryPctNoLost` |
+
+**Lost Bidder Definition**: A bidder is considered "lost" when:
+1. Their bid was **valid** at the time the failed bidder was selected (`selectedAt + promisedDuration < fulfillmentDeadline`)
+2. Their bid is **now invalid** due to the delay (`block.timestamp + promisedDuration >= fulfillmentDeadline`)
+
+This compensates publishers who lost a fulfillment opportunity through no fault of their own.
 
 ### Denylist Duration
 
@@ -256,6 +264,7 @@ Default parameters:
 - `getTreasuryBalance()` → balance
 - `getMinPublisherBond()` → minimum bond
 - `getDenylistParams()` → (baseDuration, perLostBidder, valueDivisor)
+- `getSlashDistributionParams()` → (treasuryPctNoLost, treasuryPctWithLost, lostBiddersPct)
 - `getWithdrawable(addr)` → withdrawable balance
 
 ## Deployment
@@ -284,12 +293,24 @@ WALLETSCORE_PROXY_CONTRACT_ADDRESS=0x... forge script script/WalletScore.s.sol -
    setMinPublisherBond(0.1 ether)
    ```
 
-2. Register domains:
+2. (Optional) Configure slash distribution percentages:
+   ```solidity
+   // setSlashDistributionParams(treasuryPctNoLost, treasuryPctWithLost, lostBiddersPct)
+   setSlashDistributionParams(40, 20, 50)  // defaults
+   ```
+
+3. (Optional) Configure denylist parameters:
+   ```solidity
+   // setDenylistParams(baseDuration, perLostBidder, valueDivisor)
+   setDenylistParams(1 days, 1 hours, 1 ether)  // defaults
+   ```
+
+4. Register domains:
    ```solidity
    registerDomain(keccak256("avici"), "ipfs://...")
    ```
 
-3. Register publishers:
+5. Register publishers:
    ```solidity
    registerPublisher(publisherAddress, "ipfs://...")
    ```
@@ -299,4 +320,4 @@ WALLETSCORE_PROXY_CONTRACT_ADDRESS=0x... forge script script/WalletScore.s.sol -
 - **TEE Attestation**: EigenCompute/EigenCloud integration for verified computation
 - **Merkle Proofs**: On-chain verification of individual scores via `merkleRoot` in ScoreSetMeta
 - **Stake-weighted Reputation**: Publisher reputation affecting bid selection
-- **Dynamic Slash Rates**: Configurable slash percentages based on severity
+- **Dynamic Slash Amount**: Currently fixed at 50% of bid price; could be configurable

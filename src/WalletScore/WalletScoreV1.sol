@@ -687,6 +687,14 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
 
     // ============ Internal Settlement Helpers ============
 
+    /// @notice Handles a bidder's failure to fulfill within their promised duration.
+    /// @dev Orchestrates the slashing process:
+    ///      1. Calculates lost bidders (bids that were valid at selection but are now invalid)
+    ///      2. Calculates and deducts slash amount from failed bidder's bond
+    ///      3. Calculates and applies denylist duration based on lost opportunities
+    ///      4. Distributes slashed funds to treasury, lost bidders, and next bidder
+    /// @param requestId The request that was not fulfilled
+    /// @param failedBidId The bid that failed to deliver
     function _handleBidderFailure(RequestId requestId, BidId failedBidId) internal {
         Bid storage failedBid = _bids[failedBidId];
         PublisherId failedPublisher = failedBid.publisher;
@@ -720,6 +728,15 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         emit PublisherDenylisted(failedPublisher, denylistUntil);
     }
 
+    /// @notice Identifies bidders who lost their opportunity due to another bidder's failure.
+    /// @dev A bid is considered "lost" when:
+    ///      - It was valid when the failed bidder was selected: `selectedAt + promisedDuration < fulfillmentDeadline`
+    ///      - It is now invalid due to time passing: `block.timestamp + promisedDuration >= fulfillmentDeadline`
+    ///      These bidders receive compensation from the slashed funds proportional to their quoted price.
+    /// @param requestId The request being processed
+    /// @param failedBidId The bid that failed (excluded from consideration)
+    /// @return Array of lost bidders with their bid IDs and quoted prices
+    /// @return Sum of all lost bidders' quoted prices (used for denylist calculation)
     function _calculateLostBidders(RequestId requestId, BidId failedBidId)
         internal
         view
@@ -770,11 +787,25 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         return (lostBidders, totalValue);
     }
 
+    /// @notice Calculates the slash amount for a failed bid.
+    /// @dev Currently fixed at 50% of bid price. The actual slash is capped at the publisher's
+    ///      available bond balance in `_handleBidderFailure`.
+    /// @param bidPrice The price quoted in the failed bid
+    /// @return The amount to slash from the publisher's bond
     function _calculateSlashAmount(uint256 bidPrice) internal pure returns (uint256) {
-        // Slash 50% of bid price (configurable in future versions)
+        // Slash 50% of bid price
         return bidPrice / 2;
     }
 
+    /// @notice Calculates the denylist duration based on lost opportunities.
+    /// @dev Formula: `baseDuration + (lostBidderCount * perLostBidder) + (totalLostValue / valueDivisor)`
+    ///      Parameters are configured via `setDenylistParams()`. Defaults:
+    ///      - baseDuration: 1 day
+    ///      - perLostBidder: 1 hour per lost bidder
+    ///      - valueDivisor: 1 ether (1 hour per ether of lost value)
+    /// @param lostBidderCount Number of bidders who lost their opportunity
+    /// @param totalLostValue Sum of quoted prices from lost bidders
+    /// @return Duration in seconds for the denylist
     function _calculateDenylistDuration(uint256 lostBidderCount, uint256 totalLostValue)
         internal
         view
@@ -788,6 +819,25 @@ contract WalletScoreV1 is IWalletScore, Initializable, UUPSUpgradeable, AccessCo
         return duration;
     }
 
+    /// @notice Distributes slashed funds among treasury, lost bidders, and next bidder.
+    /// @dev Distribution depends on whether lost bidders exist:
+    ///
+    ///      **With lost bidders** (default percentages):
+    ///      - Treasury: 20% (`_slashTreasuryPctWithLost`)
+    ///      - Lost bidders: 50% (`_slashLostBiddersPct`), distributed proportionally by quoted price
+    ///      - Next bidder: 30% (remainder), or requester if no valid next bidder
+    ///
+    ///      **Without lost bidders** (default percentages):
+    ///      - Treasury: 40% (`_slashTreasuryPctNoLost`)
+    ///      - Next bidder / requester: 60% (remainder)
+    ///
+    ///      Lost bidder shares are credited to their publisher bonds, not withdrawable balance.
+    ///      Percentages are configurable via `setSlashDistributionParams()`.
+    ///
+    /// @param requestId The request being processed (for refunding requester if needed)
+    /// @param slashAmount Total amount being distributed
+    /// @param lostBidders Array of lost bidders to compensate
+    /// @param nextBidId The next bidder to receive incentive (or 0 if none)
     function _distributeSlash(
         RequestId requestId,
         uint256 slashAmount,
